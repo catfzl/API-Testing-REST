@@ -1,0 +1,153 @@
+name: IAM Postman API Automated Tests
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
+  schedule:
+    - cron: '0 7 * * *' # Runs daily at 7 AM UTC
+jobs:
+  test:
+    defaults:
+      run:
+        working-directory: ./postman-tests
+    runs-on: linux-medium
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 18
+        uses: actions/setup-node@v2
+        with:
+          node-version: "18"
+
+      - name: Install newman
+        run: |
+          npm install -g newman # Installs Newman itself
+          npm install -g newman-reporter-htmlextra # Installs the HTML Extra reporter for Newman
+
+      - name: Run Postman tests
+        id: postman_tests
+        run: |
+          newman run iamAutomationSmokeTests.postman_collection.json \
+            --reporters cli --environment staging.postman_environment.json \
+            --env-var="exampleSmokeId=${{ secrets.EXAMPLE_SMOKE_ID }}" \
+            --env-var="exampleSmokeSecret=${{ secrets.EXAMPLE_SMOKE_SECRET }}"
+            --reporters cli,htmlextra,junit \
+            --reporter-htmlextra-export newman/report.html \
+            --reporter-junit-export newman/junit-report.xml \
+            --reporter-cli-no-summary \
+            --verbose
+            
+        continue-on-error: true #Continue on error so slack notification can still send on failure
+
+      - name: List files in newman directory (Debug)
+        run: |
+          echo "Listing contents of ./postman-tests/newman/"
+          ls -la newman/
+        working-directory: ./postman-tests
+
+      - name: Upload Newman HTML Test Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: postman-report
+          path: newman/report.html
+      # Setting up TestRail Integration (which requires python)
+      - name: Setup Python for TestRail CLI
+        uses: actions/setup-python@v5 # Using v5 for python setup
+        with:
+          python-version: '3.x'
+
+      - name: Install TestRail CLI
+        run: pip install trcli
+
+      - name: Upload Test Results to TestRail
+        if: always() # Always attempt to upload results to TestRail
+        run: |
+          trcli -y \
+            -h ${{ secrets.TESTRAIL_URL }} \
+            --project "${{ secrets.TESTRAIL_PROJECT_NAME }}" \
+            -u ${{ secrets.TESTRAIL_USERNAME }} \
+            -p ${{ secrets.TESTRAIL_API_KEY }} \
+            parse_junit \
+            --file ${{ github.workspace }}/postman-tests/newman/junit-report.xml \
+            --suite-id <suite-id> \
+            --title "IAM Automated Postman Tests - ${{ github.ref_name }} Run ${{ github.run_id }}" \
+            --run-description "GitHub Actions Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            --no-create
+
+        env:
+          # Pass secrets as environment variables for trcli
+          TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
+          TESTRAIL_PROJECT_NAME: ${{ secrets.TESTRAIL_PROJECT_NAME }}
+          TESTRAIL_USERNAME: ${{ secrets.TESTRAIL_USERNAME }}
+          TESTRAIL_API_KEY: ${{ secrets.TESTRAIL_API_KEY }}
+
+      - name: Determine Test Status for Slack
+        id: test_status
+        if: always()
+        run: |
+          echo "Debug: Outcome of postman_tests step is: ${{ steps.postman_tests.outcome }}" 
+          if [ "${{ steps.postman_tests.outcome }}" == "success" ]; then
+            echo "status=Success" >> "$GITHUB_OUTPUT"
+            echo "color=#2EB886" >> "$GITHUB_OUTPUT" # Green for success
+            echo "emoji=:white_check_mark:" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=Failure" >> "$GITHUB_OUTPUT"
+            echo "color=#E01E5A" >> "$GITHUB_OUTPUT" # Red for failure
+            echo "emoji=:x:" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Debug Test Status Outputs #Verifies the outputs are set
+        if: always() # Ensure this step runs even when/if previous steps have failed
+        run: |
+          echo "Debug Output - Status: '${{ steps.test_status.outputs.status }}'"
+          echo "Debug Output - Color: '${{ steps.test_status.outputs.color }}'"
+          echo "Debug Output - Emoji: '${{ steps.test_status.outputs.emoji }}'"  
+
+      - name: Post Slack Notification
+        uses: slackapi/slack-github-action@v2.1.0
+        if: always() && github.ref_name == 'main' #Ensures this step runs even when/if previous steps have failed
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "${{ steps.test_status.outputs.emoji }} Postman Tests *${{ steps.test_status.outputs.status }}* for `${{ github.repository }}` on `${{ github.ref_name }}`"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "${{ steps.test_status.outputs.emoji }} *Postman Test Run Status: ${{ steps.test_status.outputs.status }}*"
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: |          
+                    • Repository: `${{ github.repository }}`
+                    • Branch: `${{ github.ref_name }}`
+                    • Triggered by: `${{ github.actor }}`
+              - type: "actions"
+                elements:
+                  - type: "button"
+                    text:
+                      type: "plain_text"
+                      text: "View Postman Workflow Run"
+                      emoji: true
+                    style: "${{ steps.test_status.outputs.status == 'Success' && 'primary' || 'danger' }}"
+                    url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              - type: "context"
+                elements:
+                  - type: "mrkdwn"
+                    text: "Workflow run ID: `${{ github.run_id }}`"
+                  - type: "mrkdwn"
+                    text: "Commit SHA: `${{ github.sha }}`"
+                  - type: "mrkdwn"
+                    text: "Test Report: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/postman-report|Download>" # Link to download artifact
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
