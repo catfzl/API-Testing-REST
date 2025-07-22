@@ -1,0 +1,703 @@
+// This is a santized version of obtaining and setting a m2m token, and workflow, where a user is created, invited to activate their account, completes activation, and confirming outputs from the workflow with a get request, and is for demonstration purposes only
+
+{
+  "info": {
+    "_postman_id": "GENERIC-POSTMAN-ID",
+    "name": "Identity Service Automation Smoke Tests",
+    "description": "A collection to be used for automating endpoints in services the Identity Service Team(s) own.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "GENERIC_EXPORTER_ID",
+    "_collection_link": "https://<company-name>-integrations.postman.co/workspace/Generic-Workspace~GENERIC_WORKSPACE_ID/collection/GENERIC_COLLECTION_ID?action=share&source=collection_link&creator=GENERIC_CREATOR_ID"
+  },
+  "item": [
+    {
+      "name": "Setup",
+      "item": [
+        {
+          "name": "Get + Set Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "",
+                  "pm.test('set access token expiry', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "",
+                  "    var jsonData = JSON.parse(responseBody);",
+                  "    const now = new Date();",
+                  "    const secondsSinceEpoch = Math.round(now.getTime() / 1000);",
+                  "    postman.setEnvironmentVariable('accessTokenExpiry', secondsSinceEpoch + jsonData.token.expiresIn);",
+                  "});",
+                  "",
+                  "pm.test('set access token', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    ",
+                  "    var jsonData = JSON.parse(responseBody);",
+                  "    postman.setEnvironmentVariable('accessToken', jsonData.token.accessToken);",
+                  "});",
+                  "",
+                  "pm.test('set refresh token', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    ",
+                  "    var jsonData = JSON.parse(responseBody);",
+                  "    var refreshToken = jsonData.token.refreshToken || pm.collectionVariables.get(\"refreshToken\")",
+                  "    pm.collectionVariables.set(\"refreshToken\", refreshToken);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"{{exampleSmokeId}}\",\n  \"clientSecret\": \"{{exampleSmokeSecret}}\",\n  \"userAccessType\": \"GENERIC_MACHINE_CLIENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{hostname}}/auth-service/v1/authentication/login",
+              "host": [
+                "{{hostname}}"
+              ],
+              "path": [
+                "auth-service",
+                "v1",
+                "authentication",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1 - User Creation - Account Activation",
+      "item": [
+        {
+          "name": "1.1 Create User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = JSON.parse(responseBody);",
+                  "",
+                  "pm.environment.set('userGuid', jsonData.guid)",
+                  "",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "//Extract email from response",
+                  "const responseJson = pm.response.json();",
+                  "const generatedEmail = responseJson.email;",
+                  "",
+                  "//Stores the email in an environment variable",
+                  "pm.environment.set(\"userEmail\", generatedEmail);",
+                  "",
+                  "//for debugging",
+                  "console.log(\"Generated email:\", generatedEmail); ",
+                  "",
+                  "//extract userGuid from response",
+                  "const generatedUserGuid = responseJson.guid;",
+                  "pm.environment.set(\"userGuid\", generatedUserGuid);",
+                  "",
+                  "//for debugging",
+                  "console.log(\"Generated userGuid:\", generatedUserGuid);",
+                  "",
+                  "//extract phoneNumber from response",
+                  "const generatedPhoneNumber = responseJson.phoneNumber;",
+                  "pm.environment.set(\"userPhoneNumber\",generatedPhoneNumber);",
+                  "",
+                  "//for debugging",
+                  "console.log(\"Generated phoneNumber:\", generatedPhoneNumber);",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "//set emailPrefix to specific value",
+                  "pm.environment.set(\"emailPrefix\", \"generic.user\");",
+                  "",
+                  "//Generate a random emailSuffix (numeric)",
+                  "const randomSuffix = Math.floor(100000 + Math.random() * 9000000); //Generate a 6-digit number",
+                  "pm.environment.set(\"emailSuffix\", randomSuffix.toString());",
+                  "",
+                  "//Set userSecret is to a specific value",
+                  "pm.environment.set(\"userSecret\", \"GenericSecret123!\");",
+                  "",
+                  "//Set firstName and last name to specific strings",
+                  "pm.environment.set(\"userFirstName\", \"IdentityService\");",
+                  "pm.environment.set(\"userLastName\", \"TestUser\");",
+                  "",
+                  "//Set chosenName to emailPrefix + emailSuffix",
+                  "const chosenName = pm.environment.get(\"emailPrefix\") + \"+\" + pm.environment.get(\"emailSuffix\");",
+                  "pm.environment.set(\"userChosenName\", chosenName);",
+                  "",
+                  "//Generate a random phone number",
+                  "const phoneNumber = Math.floor(1000000000 + Math.random() * 9000000000);",
+                  "pm.environment.set(\"userPhoneNumber\", phoneNumber);",
+                  "",
+                  "// --- Debugging Logs ---",
+                  "console.log(\"--- Create User (Account Activation) Pre-request Script ---\");",
+                  "console.log(\"  emailPrefix:\", pm.environment.get(\"emailPrefix\"));",
+                  "console.log(\"  emailSuffix:\", pm.environment.get(\"emailSuffix\"));",
+                  "console.log(\"  userSecret:\", pm.environment.get(\"userSecret\"));",
+                  "console.log(\"  userFirstName:\", pm.environment.get(\"userFirstName\"));",
+                  "console.log(\"  userLastName:\", pm.environment.get(\"userLastName\"));",
+                  "console.log(\"  userChosenName:\", pm.environment.get(\"userChosenName\"));",
+                  "console.log(\"  userPhoneNumber:\", pm.environment.get(\"userPhoneNumber\"));",
+                  "console.log(\"  --- End ---\");",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "disabledSystemHeaders": {}
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{headerKeyEntityGuid}}",
+                "value": "{{genericEntityGuid}}"
+              },
+              {
+                "key": "{{headerKeyManagementSetGuid}}",
+                "value": "{{genericManagementSetGuid}}"
+              },
+              {
+                "key": "{{headerKeyEntitySetGuid}}",
+                "value": "{{genericEntitySetGuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain>.com\",\n  \"secret\": \"GenericSecret123!\",\n  \"userAccessType\": \"GENERIC_ACCESS\",\n  \"email\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain.com\",\n  \"firstName\": \"{{userFirstName}}\",\n  \"chosenName\": \"{{userChosenName}}\",\n  \"lastName\": \"{{userLastName}}\",\n  \"phoneNumber\": {{userPhoneNumber}},\n  \"imagePath\": null,\n  \"heightWidthRatio\": 0.0,\n  \"defaultEntityGuid\": \"{{genericEntityGuid}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{hostname}}/user-management/v1/users",
+              "host": [
+                "{{hostname}}"
+              ],
+              "path": [
+                "user-management",
+                "v1",
+                "customers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.2 Generate Verification Code",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "//Get email from the environment variable set in create consumer post script",
+                  "const userEmail = pm.environment.get(\"userEmail\");"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "//Post response script for Generate Email Verification",
+                  "//Extract verificationCode from response",
+                  "const responseJson = pm.response.json();",
+                  "const verificationCode = responseJson.verificationCode;",
+                  "",
+                  "//Stores the verification code in an environment variable",
+                  "pm.environment.set(\"verificationCode\", verificationCode);",
+                  "",
+                  "//for debugging",
+                  "console.log(\"Generated verification code:\", verificationCode); "
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{userEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{hostname}}/user-management/v1/users/verification/generate",
+              "host": [
+                "{{hostname}}"
+              ],
+              "path": [
+                "user-management",
+                "v1",
+                "users",
+                "verification",
+                "generate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 Verify Email Invitation Activation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "//Get email from the environment variable set in create consumer post script",
+                  "const userEmail = pm.environment.get(\"userEmail\");",
+                  "",
+                  "//Get verification code from the environment variable set in generate verification code post script",
+                  "const verificationCode = pm.environment.get(\"verificationCode\");",
+                  "",
+                  "//Set request body with both verification code",
+                  "pm.request.body = {",
+                  "    mode:'raw',",
+                  "    raw: JSON.stringify({",
+                  "        verificationCode: verificationCode",
+                  "    })",
+                  "};",
+                  "",
+                  "console.log(\"Verification code for email vericiation/activation:\", verificationCode);",
+                  "",
+                  "//debugging",
+                  "console.log(\"verificationCode:\", pm.environment.get(\"verificationCode\"));",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Content-Type is present\", function () {",
+                  "    pm.response.to.have.header(\"Content-Type\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "disabledSystemHeaders": {
+              "content-type": true
+            }
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"verificationCode\": \"{{verificationCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{hostname}}/user-management/v1/users/verification/verify",
+              "host": [
+                "{{hostname}}"
+              ],
+              "path": [
+                "user-management",
+                "v1",
+                "users",
+                "verification",
+                "verify"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.4 Add Entity Access",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "//Get userGuid from the environment variable set in create consumer post script",
+                  "const userGuid = pm.environment.get(\"userGuid\");",
+                  "",
+                  "//Construct the request body dynamically",
+                  "pm.request.body = {",
+                  "    mode: 'raw',",
+                  "    raw: JSON.stringify({",
+                  "        \"passcode\": pm.environment.get(\"currentRandomPasscode\"), // Use the generated random passcode",
+                  "        \"externalEmployeeId\": null,",
+                  "        \"jobGuids\": null,",
+                  "        \"requestedByGuid\": null,",
+                  "        \"skipEmails\": true,",
+                  "        \"autoPasscode\": false",
+                  "    })",
+                  "};",
+                  "",
+                  "// Debugging",
+                  "console.log(\"Pre-request (Add Access):\");",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 204\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "disabledSystemHeaders": {
+              "content-type": true
+            }
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"passcode\": \"{{currentRandomPasscode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{hostname}}/user-attributes/v1/users/:entityId/:userId/add",
+              "host": [
+                "{{hostname}}"
+              ],
+              "path": [
+                "user-attributes",
+                "v1",
+                "users",
+                ":entityId",
+                ":userId",
+                "add"
+              ],
+              "variable": [
+                {
+                  "key": "entityId",
+                  "value": "{{genericEntityGuid}}"
+                },
+                {
+                  "key": "userId",
+                  "value": "{{userGuid}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.5 Get Consumer - confirm user is now active",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "//Get userGuid from the environment variable set in create consumer post script",
+                  "const userGuid = pm.environment.get(\"userGuid\");",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response time is less than 200ms\", function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(200);",
+                  "});",
+                  "pm.test(\"Verify user is now active\"), function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.data.hasAccess).to.be.true;",
+                  "}",
+                  "pm.test(\"Verify GENERIC_TEST_USER is present under roles\"), function() {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(pm.response.text()).to.include(\"GENERIC_TEST_USER\");",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "{{headerKeyEntityGuid}}",
+                "value": "{{genericEntityGuid}}"
+              },
+              {
+                "key": "{{headerKeyManagementSetGuid}}",
+                "value": "{{genericManagementSetGuid}}",
+                "type": "text"
+              },
+              {
+                "key": "{{headerKeyEntitySetGuid}}",
+                "value": "{{genericEntitySetGuid}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{hostname}}/user-management/v1/users/:userId?userAccessType=GENERIC_ACCESS",
+              "host": [
+                "{{hostname}}"
+              ],
+              "path": [
+                "user-management",
+                "v1",
+                "users",
+                ":userId"
+              ],
+              "query": [
+                {
+                  "key": "userAccessType",
+                  "value": "GENERIC_ACCESS"
+                },
+                {
+                  "key": "includeExternalId",
+                  "value": "true"
+                },
+                {
+                  "key": "includeDeleted",
+                  "value": "false"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "{{userGuid}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.environment.set(\"emailSuffix\", \"<company-domain>.com\");",
+              "pm.environment.set(\"genericEntityGuid\", \"<GENERIC_ENTITY_GUID_1>\");",
+              "pm.environment.set(\"genericEntitySetGuid\", \"<GENERIC_ENTITY_SET_GUID_1>\");",
+              "pm.environment.set(\"genericManagementSetGuid\", \"<GENERIC_MANAGEMENT_SET_GUID_1>\");",
+              "",
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              ""
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [
+          "//Collection Level Pre-request script ",
+          "",
+          "//Generate a random 6 digit number for the passcode",
+          "const min = 100000;",
+          "const max = 999999;",
+          "const randomPasscodeNumber = Math.floor(Math.random()*(max-min +1))+min;",
+          "",
+          "//Converts the number to a string",
+          "const randomPasscode = randomPasscodeNumber.toString();",
+          "",
+          "//Store the random passcode as an environment variable.",
+          "pm.environment.set(\"currentRandomPasscode\", randomPasscode); //using `currentRandomPasscode` to indicate it's for the current request/iteration)",
+          "",
+          "//Debugging - will appear in the console for every request",
+          "console.log(\"Collection Pre-request: Generated Passcode: \", randomPasscode);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "emailSuffix",
+      "value": ""
+    },
+    {
+      "key": "genericEntityGuid",
+      "value": ""
+    },
+    {
+      "key": "genericEntitySetGuid",
+      "value": ""
+    },
+    {
+      "key": "genericManagementSetGuid",
+      "value": ""
+    },
+    {
+      "key": "originalUserGuidForArchivedFlow",
+      "value": ""
+    },
+    {
+      "key": "genericRequesterUserGuid",
+      "value": ""
+    },
+    {
+      "key": "genericInvitedByGuid",
+      "value": ""
+    },
+    {
+      "key": "jobGuids",
+      "value": ""
+    },
+    {
+      "key": "generatedPasscode",
+      "value": ""
+    }
+  ]
+}
