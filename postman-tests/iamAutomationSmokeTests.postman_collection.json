@@ -1,10 +1,10 @@
-// This is a santized version of obtaining and setting a m2m token, and workflow, where a user is created, invited to activate their account, completes activation, and confirming outputs from the workflow with a get request, and is for demonstration purposes only
+// This is a sanitized version of obtaining and setting a m2m token, and workflow, where a user is created, invited to activate their account, completes activation, and confirming outputs from the workflow with a get request, and is for demonstration purposes only
 
 {
   "info": {
     "_postman_id": "GENERIC-POSTMAN-ID",
     "name": "Identity Service Automation Smoke Tests",
-    "description": "A collection to be used for automating endpoints in services the Identity Service Team(s) own.",
+    "description": "A collection to be used for automating endpoints in services the Identity Service Team(s) own. This collection includes scripts for TestRail integration.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "GENERIC_EXPORTER_ID",
     "_collection_link": "https://<company-name>-integrations.postman.co/workspace/Generic-Workspace~GENERIC_WORKSPACE_ID/collection/GENERIC_COLLECTION_ID?action=share&source=collection_link&creator=GENERIC_CREATOR_ID"
@@ -20,6 +20,10 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "// TestRail Case ID for this request. This ID should correspond to an existing TestRail test case.",
+                  "const testRailCaseId = \"TR_C_001\";",
+                  "let testStatus = 1; // Default to Passed (TestRail status_id for Passed)",
+                  "let testComment = \"All tests passed.\";",
                   "",
                   "pm.test('set access token expiry', function() {",
                   "    pm.response.to.have.status(200);",
@@ -41,9 +45,53 @@
                   "    pm.response.to.have.status(200);",
                   "    ",
                   "    var jsonData = JSON.parse(responseBody);",
-                  "    var refreshToken = jsonData.token.refreshToken || pm.collectionVariables.get(\"refreshToken\")",
+                  "    var refreshToken = jsonData.token.refreshToken || pm.collectionVariables.get(\"refreshToken\");",
                   "    pm.collectionVariables.set(\"refreshToken\", refreshToken);",
-                  "});"
+                  "});",
+                  "",
+                  "// Check if any tests failed in this request",
+                  "// pm.test.runner.getFailures() is a Postman API method to get an array of failed tests for the current request.",
+                  "if (pm.response.code !== 200 || pm.test.runner.getFailures().length > 0) {",
+                  "    testStatus = 5; // Failed (TestRail status_id for Failed)",
+                  "    testComment = `Tests failed for Get + Set Access Token (Status: ${pm.response.code}):`;",
+                  "    pm.test.runner.getFailures().forEach(failure => {",
+                  "        testComment += `\\n- ${failure.name}: ${failure.message}`;",
+                  "    });",
+                  "}",
+                  "",
+                  "// Send result to TestRail (requires TestRail environment variables to be set in Postman environment)",
+                  "// These variables are typically passed into Newman via GitHub Actions secrets.",
+                  "const testRailRunId = pm.collectionVariables.get(\"testRailRunId\");",
+                  "const testRailUrl = pm.environment.get(\"testRailUrl\");",
+                  "const testRailUsername = pm.environment.get(\"testRailUsername\");",
+                  "const testRailApiKey = pm.environment.get(\"testRailApiKey\");",
+                  "",
+                  "if (testRailRunId && testRailUrl && testRailUsername && testRailApiKey) {",
+                  "    pm.sendRequest({",
+                  "        url: `${testRailUrl}/index.php?/api/v2/add_result_for_case/${testRailRunId}/${testRailCaseId}`,",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'Authorization': 'Basic ' + btoa(`${testRailUsername}:${testRailApiKey}`)",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({",
+                  "                status_id: testStatus,",
+                  "                comment: testComment",
+                  "            })",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        if (err) {",
+                  "            console.error(\"TestRail API Error (add_result_for_case):\");",
+                  "            console.error(err);",
+                  "        } else {",
+                  "            console.log(\"TestRail result submitted for case \" + testRailCaseId + \": \" + res.json().id);",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.warn(\"Skipping TestRail result submission for \" + testRailCaseId + \": Missing TestRail config or Run ID.\");",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -104,6 +152,11 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "// TestRail Case ID for this request",
+                  "const testRailCaseId = \"TR_C_002\";",
+                  "let testStatus = 1; // Default to Passed",
+                  "let testComment = \"All tests passed.\";",
+                  "",
                   "var jsonData = JSON.parse(responseBody);",
                   "",
                   "pm.environment.set('userGuid', jsonData.guid)",
@@ -135,7 +188,48 @@
                   "",
                   "//for debugging",
                   "console.log(\"Generated phoneNumber:\", generatedPhoneNumber);",
-                  ""
+                  "",
+                  "// Check if any tests failed in this request",
+                  "if (pm.response.code !== 200 || pm.test.runner.getFailures().length > 0) {",
+                  "    testStatus = 5; // Failed",
+                  "    testComment = `Tests failed for Create User (Status: ${pm.response.code}):`;",
+                  "    pm.test.runner.getFailures().forEach(failure => {",
+                  "        testComment += `\\n- ${failure.name}: ${failure.message}`;",
+                  "    });",
+                  "}",
+                  "",
+                  "// Send result to TestRail",
+                  "const testRailRunId = pm.collectionVariables.get(\"testRailRunId\");",
+                  "const testRailUrl = pm.environment.get(\"testRailUrl\");",
+                  "const testRailUsername = pm.environment.get(\"testRailUsername\");",
+                  "const testRailApiKey = pm.environment.get(\"testRailApiKey\");",
+                  "",
+                  "if (testRailRunId && testRailUrl && testRailUsername && testRailApiKey) {",
+                  "    pm.sendRequest({",
+                  "        url: `${testRailUrl}/index.php?/api/v2/add_result_for_case/${testRailRunId}/${testRailCaseId}`,",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'Authorization': 'Basic ' + btoa(`${testRailUsername}:${testRailApiKey}`)",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({",
+                  "                status_id: testStatus,",
+                  "                comment: testComment",
+                  "            })",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        if (err) {",
+                  "            console.error(\"TestRail API Error (add_result_for_case):\");",
+                  "            console.error(err);",
+                  "        } else {",
+                  "            console.log(\"TestRail result submitted for case \" + testRailCaseId + \": \" + res.json().id);",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.warn(\"Skipping TestRail result submission for \" + testRailCaseId + \": Missing TestRail config or Run ID.\");",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -205,7 +299,8 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain>.com\",\n  \"secret\": \"GenericSecret123!\",\n  \"userAccessType\": \"GENERIC_ACCESS\",\n  \"email\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain.com\",\n  \"firstName\": \"{{userFirstName}}\",\n  \"chosenName\": \"{{userChosenName}}\",\n  \"lastName\": \"{{userLastName}}\",\n  \"phoneNumber\": {{userPhoneNumber}},\n  \"imagePath\": null,\n  \"heightWidthRatio\": 0.0,\n  \"defaultEntityGuid\": \"{{genericEntityGuid}}\"\n}",
+              "raw": "{\n  \"username\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain>.com\",\n  \"secret\": \"GenericSecret123!\",\n  \"userAccessType\": \"GENERIC_ACCESS\",\n  \"email\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain>.com\",\n  \"firstName\": \"{{userFirstName}}\",\n  \"chosenName\": \"{{userChosenName}}\",
+              "lastName": \"{{userLastName}}\",\n  \"phoneNumber\": {{userPhoneNumber}},\n  \"imagePath\": null,\n  \"heightWidthRatio\": 0.0,\n  \"defaultEntityGuid\": \"{{genericEntityGuid}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -220,7 +315,7 @@
               "path": [
                 "user-management",
                 "v1",
-                "customers"
+                "users"
               ]
             }
           },
@@ -244,6 +339,11 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "// TestRail Case ID for this request",
+                  "const testRailCaseId = \"TR_C_003\";",
+                  "let testStatus = 1; // Default to Passed",
+                  "let testComment = \"All tests passed.\";",
+                  "",
                   "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
@@ -257,7 +357,49 @@
                   "pm.environment.set(\"verificationCode\", verificationCode);",
                   "",
                   "//for debugging",
-                  "console.log(\"Generated verification code:\", verificationCode); "
+                  "console.log(\"Generated verification code:\", verificationCode); ",
+                  "",
+                  "// Check for failures",
+                  "if (pm.response.code !== 200 || pm.test.runner.getFailures().length > 0) {",
+                  "    testStatus = 5; // Failed",
+                  "    testComment = `Tests failed for Generate Verification Code (Status: ${pm.response.code}):`;",
+                  "    pm.test.runner.getFailures().forEach(failure => {",
+                  "        testComment += `\\n- ${failure.name}: ${failure.message}`;",
+                  "    });",
+                  "}",
+                  "",
+                  "// Send result to TestRail",
+                  "const testRailRunId = pm.collectionVariables.get(\"testRailRunId\");",
+                  "const testRailUrl = pm.environment.get(\"testRailUrl\");",
+                  "const testRailUsername = pm.environment.get(\"testRailUsername\");",
+                  "const testRailApiKey = pm.environment.get(\"testRailApiKey\");",
+                  "",
+                  "if (testRailRunId && testRailUrl && testRailUsername && testRailApiKey) {",
+                  "    pm.sendRequest({",
+                  "        url: `${testRailUrl}/index.php?/api/v2/add_result_for_case/${testRailRunId}/${testRailCaseId}`,",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'Authorization': 'Basic ' + btoa(`${testRailUsername}:${testRailApiKey}`)",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({",
+                  "                status_id: testStatus,",
+                  "                comment: testComment",
+                  "            })",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        if (err) {",
+                  "            console.error(\"TestRail API Error (add_result_for_case):\");",
+                  "            console.error(err);",
+                  "        } else {",
+                  "            console.log(\"TestRail result submitted for case \" + testRailCaseId + \": \" + res.json().id);",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.warn(\"Skipping TestRail result submission for \" + testRailCaseId + \": Missing TestRail config or Run ID.\");",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -305,7 +447,7 @@
                   "//Get verification code from the environment variable set in generate verification code post script",
                   "const verificationCode = pm.environment.get(\"verificationCode\");",
                   "",
-                  "//Set request body with both verification code",
+                  "//Set request body with verification code",
                   "pm.request.body = {",
                   "    mode:'raw',",
                   "    raw: JSON.stringify({",
@@ -327,12 +469,59 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "// TestRail Case ID for this request",
+                  "const testRailCaseId = \"TR_C_004\";",
+                  "let testStatus = 1; // Default to Passed",
+                  "let testComment = \"All tests passed.\";",
+                  "",
                   "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
                   "pm.test(\"Content-Type is present\", function () {",
                   "    pm.response.to.have.header(\"Content-Type\");",
-                  "});"
+                  "});",
+                  "",
+                  "// Check for failures",
+                  "if (pm.response.code !== 200 || pm.test.runner.getFailures().length > 0) {",
+                  "    testStatus = 5; // Failed",
+                  "    testComment = `Tests failed for Verify Email Invitation Activation (Status: ${pm.response.code}):`;",
+                  "    pm.test.runner.getFailures().forEach(failure => {",
+                  "        testComment += `\\n- ${failure.name}: ${failure.message}`;",
+                  "    });",
+                  "}",
+                  "",
+                  "// Send result to TestRail",
+                  "const testRailRunId = pm.collectionVariables.get(\"testRailRunId\");",
+                  "const testRailUrl = pm.environment.get(\"testRailUrl\");",
+                  "const testRailUsername = pm.environment.get(\"testRailUsername\");",
+                  "const testRailApiKey = pm.environment.get(\"testRailApiKey\");",
+                  "",
+                  "if (testRailRunId && testRailUrl && testRailUsername && testRailApiKey) {",
+                  "    pm.sendRequest({",
+                  "        url: `${testRailUrl}/index.php?/api/v2/add_result_for_case/${testRailRunId}/${testRailCaseId}`,",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'Authorization': 'Basic ' + btoa(`${testRailUsername}:${testRailApiKey}`)",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({",
+                  "                status_id: testStatus,",
+                  "                comment: testComment",
+                  "            })",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        if (err) {",
+                  "            console.error(\"TestRail API Error (add_result_for_case):\");",
+                  "            console.error(err);",
+                  "        } else {",
+                  "            console.log(\"TestRail result submitted for case \" + testRailCaseId + \": \" + res.json().id);",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.warn(\"Skipping TestRail result submission for \" + testRailCaseId + \": Missing TestRail config or Run ID.\");",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -413,9 +602,56 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "// TestRail Case ID for this request",
+                  "const testRailCaseId = \"TR_C_005\";",
+                  "let testStatus = 1; // Default to Passed",
+                  "let testComment = \"All tests passed.\";",
+                  "",
                   "pm.test(\"Status code is 204\", function () {",
                   "    pm.response.to.have.status(204);",
-                  "});"
+                  "});",
+                  "",
+                  "// Check for failures",
+                  "if (pm.response.code !== 204 || pm.test.runner.getFailures().length > 0) {",
+                  "    testStatus = 5; // Failed",
+                  "    testComment = `Tests failed for Add Entity Access (Status: ${pm.response.code}):`;",
+                  "    pm.test.runner.getFailures().forEach(failure => {",
+                  "        testComment += `\\n- ${failure.name}: ${failure.message}`;",
+                  "    });",
+                  "}",
+                  "",
+                  "// Send result to TestRail",
+                  "const testRailRunId = pm.collectionVariables.get(\"testRailRunId\");",
+                  "const testRailUrl = pm.environment.get(\"testRailUrl\");",
+                  "const testRailUsername = pm.environment.get(\"testRailUsername\");",
+                  "const testRailApiKey = pm.environment.get(\"testRailApiKey\");",
+                  "",
+                  "if (testRailRunId && testRailUrl && testRailUsername && testRailApiKey) {",
+                  "    pm.sendRequest({",
+                  "        url: `${testRailUrl}/index.php?/api/v2/add_result_for_case/${testRailRunId}/${testRailCaseId}`,",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'Authorization': 'Basic ' + btoa(`${testRailUsername}:${testRailApiKey}`)",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({",
+                  "                status_id: testStatus,",
+                  "                comment: testComment",
+                  "            })",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        if (err) {",
+                  "            console.error(\"TestRail API Error (add_result_for_case):\");",
+                  "            console.error(err);",
+                  "        } else {",
+                  "            console.log(\"TestRail result submitted for case \" + testRailCaseId + \": \" + res.json().id);",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.warn(\"Skipping TestRail result submission for \" + testRailCaseId + \": Missing TestRail config or Run ID.\");",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -501,6 +737,11 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "// TestRail Case ID for this request",
+                  "const testRailCaseId = \"TR_C_006\";",
+                  "let testStatus = 1; // Default to Passed",
+                  "let testComment = \"All tests passed.\";",
+                  "",
                   "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
@@ -515,7 +756,48 @@
                   "    const responseJson = pm.response.json();",
                   "    pm.expect(pm.response.text()).to.include(\"GENERIC_TEST_USER\");",
                   "}",
-                  ""
+                  "",
+                  "// Check for failures",
+                  "if (pm.response.code !== 200 || pm.test.runner.getFailures().length > 0) {",
+                  "    testStatus = 5; // Failed",
+                  "    testComment = `Tests failed for Get Consumer - confirm user is now active (Status: ${pm.response.code}):`;",
+                  "    pm.test.runner.getFailures().forEach(failure => {",
+                  "        testComment += `\\n- ${failure.name}: ${failure.message}`;",
+                  "    });",
+                  "}",
+                  "",
+                  "// Send result to TestRail",
+                  "const testRailRunId = pm.collectionVariables.get(\"testRailRunId\");",
+                  "const testRailUrl = pm.environment.get(\"testRailUrl\");",
+                  "const testRailUsername = pm.environment.get(\"testRailUsername\");",
+                  "const testRailApiKey = pm.environment.get(\"testRailApiKey\");",
+                  "",
+                  "if (testRailRunId && testRailUrl && testRailUsername && testRailApiKey) {",
+                  "    pm.sendRequest({",
+                  "        url: `${testRailUrl}/index.php?/api/v2/add_result_for_case/${testRailRunId}/${testRailCaseId}`,",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'Authorization': 'Basic ' + btoa(`${testRailUsername}:${testRailApiKey}`)",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({",
+                  "                status_id: testStatus,",
+                  "                comment: testComment",
+                  "            })",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        if (err) {",
+                  "            console.error(\"TestRail API Error (add_result_for_case):\");",
+                  "            console.error(err);",
+                  "        } else {",
+                  "            console.log(\"TestRail result submitted for case \" + testRailCaseId + \": \" + res.json().id);",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.warn(\"Skipping TestRail result submission for \" + testRailCaseId + \": Missing TestRail config or Run ID.\");",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -600,7 +882,7 @@
             "type": "text/javascript",
             "packages": {},
             "exec": [
-              "pm.environment.set(\"emailSuffix\", \"<company-domain>.com\");",
+              "pm.environment.set(\"emailSuffix\", \"<company-domain.com>\");",
               "pm.environment.set(\"genericEntityGuid\", \"<GENERIC_ENTITY_GUID_1>\");",
               "pm.environment.set(\"genericEntitySetGuid\", \"<GENERIC_ENTITY_SET_GUID_1>\");",
               "pm.environment.set(\"genericManagementSetGuid\", \"<GENERIC_MANAGEMENT_SET_GUID_1>\");",
@@ -610,94 +892,66 @@
           }
         },
         {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "packages": {},
-            "exec": [
-              ""
-            ]
-          }
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ],
+          "variable": [
+            {
+              "key": "refreshToken",
+              "value": ""
+            },
+            {
+              "key": "emailSuffix",
+              "value": ""
+            },
+            {
+              "key": "genericEntityGuid",
+              "value": ""
+            },
+            {
+              "key": "genericEntitySetGuid",
+              "value": ""
+            },
+            {
+              "key": "genericManagementSetGuid",
+              "value": ""
+            },
+            {
+              "key": "originalUserGuidForArchivedFlow",
+              "value": ""
+            },
+            {
+              "key": "genericRequesterUserGuid",
+              "value": ""
+            },
+            {
+              "key": "genericInvitedByGuid",
+              "value": ""
+            },
+            {
+              "key": "jobGuids",
+              "value": ""
+            },
+            {
+              "key": "generatedPasscode",
+              "value": ""
+            },
+            {
+              "key": "testRailRunId",
+              "value": "",
+              "description": "Stores the ID of the TestRail run created at collection start."
+            },
+            {
+              "key": "testRailCaseIdPrefix",
+              "value": "TR_C_",
+              "description": "Prefix for TestRail Case IDs used in this collection."
+            }
+          ]
         }
-      ]
-    }
-  ],
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "packages": {},
-        "exec": [
-          "//Collection Level Pre-request script ",
-          "",
-          "//Generate a random 6 digit number for the passcode",
-          "const min = 100000;",
-          "const max = 999999;",
-          "const randomPasscodeNumber = Math.floor(Math.random()*(max-min +1))+min;",
-          "",
-          "//Converts the number to a string",
-          "const randomPasscode = randomPasscodeNumber.toString();",
-          "",
-          "//Store the random passcode as an environment variable.",
-          "pm.environment.set(\"currentRandomPasscode\", randomPasscode); //using `currentRandomPasscode` to indicate it's for the current request/iteration)",
-          "",
-          "//Debugging - will appear in the console for every request",
-          "console.log(\"Collection Pre-request: Generated Passcode: \", randomPasscode);"
-        ]
-      }
-    },
-    {
-      "listen": "test",
-      "script": {
-        "type": "text/javascript",
-        "packages": {},
-        "exec": [
-          ""
-        ]
-      }
-    }
-  ],
-  "variable": [
-    {
-      "key": "refreshToken",
-      "value": ""
-    },
-    {
-      "key": "emailSuffix",
-      "value": ""
-    },
-    {
-      "key": "genericEntityGuid",
-      "value": ""
-    },
-    {
-      "key": "genericEntitySetGuid",
-      "value": ""
-    },
-    {
-      "key": "genericManagementSetGuid",
-      "value": ""
-    },
-    {
-      "key": "originalUserGuidForArchivedFlow",
-      "value": ""
-    },
-    {
-      "key": "genericRequesterUserGuid",
-      "value": ""
-    },
-    {
-      "key": "genericInvitedByGuid",
-      "value": ""
-    },
-    {
-      "key": "jobGuids",
-      "value": ""
-    },
-    {
-      "key": "generatedPasscode",
-      "value": ""
-    }
-  ]
-}
