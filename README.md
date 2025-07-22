@@ -1,6 +1,10 @@
 > [!Note] API-Automation-Testing-REST
 > This repository showcases example automated API testing using industry standard tools and techniques, demonstrating how to effectively test RESTful APIs, ensuring functionality, reliability, and performance.
-
+---
+[![Chat in Slack #<slack-channel>](https://img.shields.io/badge/chat-%23<slack--channel>-FF4C00.svg?logo=slack)](
+https://<company--domain>.slack.com/archives/CL8MM972P)
+[![Code owners](https://img.shields.io/badge/Code%20Owners-%40<company--domain>%2Fidentity--access--management-FF4C00?)](
+./CODEOWNERS)
 
 # IAM Automation Testing
 This repository houses automated end-to-end (E2E) tests for the services owned by an IAM (Identity and Access Management) team. It integrates with a CI/CD pipeline that automatically runs tests on code pushes and a daily schedule. By reporting status to Slack, and pushing detailed results to TestRail, this offers a comprehensive Postman automation solution; facilitating API testing, performance validation, and streamlined collection execution for robust regression testing and quality assurance.
