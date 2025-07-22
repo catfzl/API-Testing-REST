@@ -299,8 +299,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain>.com\",\n  \"secret\": \"GenericSecret123!\",\n  \"userAccessType\": \"GENERIC_ACCESS\",\n  \"email\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain>.com\",\n  \"firstName\": \"{{userFirstName}}\",\n  \"chosenName\": \"{{userChosenName}}\",
-              "lastName": \"{{userLastName}}\",\n  \"phoneNumber\": {{userPhoneNumber}},\n  \"imagePath\": null,\n  \"heightWidthRatio\": 0.0,\n  \"defaultEntityGuid\": \"{{genericEntityGuid}}\"\n}",
+              "raw": "{\n \"username\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain>.com\",\n \"secret\": \"GenericSecret123!\",\n \"userAccessType\": \"GENERIC_ACCESS\",\n \"email\": \"{{emailPrefix}}+{{emailSuffix}}@<company-domain>.com\",\n \"firstName\": \"{{userFirstName}}\",\n \"chosenName\": \"{{userChosenName}}\",\n \"lastName\": \"{{userLastName}}\",\n \"phoneNumber\": {{userPhoneNumber}},\n \"imagePath\": null,\n \"heightWidthRatio\": 0.0,\n \"defaultEntityGuid\": \"{{genericEntityGuid}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
